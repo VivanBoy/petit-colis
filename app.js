@@ -123,7 +123,7 @@ async function shrinkImage(file, max = 1600) {
 // =========================================================
 // Page de création
 // =========================================================
-function builder() {
+function builder(justSent = null) {
   document.title = "Petit Colis Doux";
   app.innerHTML = `
   ${CONFIGURED ? "" : `<div class="setup"><b>Presque prêt.</b> Ouvre <code>config.js</code> et colle l'URL et la clé de ton projet Supabase (voir le README).</div>`}
@@ -228,10 +228,12 @@ function builder() {
       if (error?.message?.includes("connexion requise")) { loginView("Ta session a expiré. Reconnecte-toi : ton colis est gardé."); return; }
       if (error?.message?.includes("limite quotidienne")) throw new Error("Tu as atteint la limite de 50 colis aujourd'hui. Réessaie demain.");
       if (error || !code) throw error || new Error("pas de code");
-      const link = shareLink(code);
-      $("#link").value = link; $("#prev").href = link; $("#out").hidden = false;
-      renderSent();
-      $("#out").scrollIntoView({ behavior: "smooth", block: "center" });
+      // Colis envoyé : on vide la boîte pour que le prochain colis reparte de zéro
+      const sentTo = state.to.trim();
+      Object.assign(state, { to: "", from: state.from, msg: "", q: ITEMS.map(() => 0), c: [] });
+      save();
+      builder({ link: shareLink(code), to: sentTo });
+      return;
     } catch (err) {
       console.error(err);
       $("#generr").textContent = err?.message?.startsWith("Tu as atteint") ? err.message : "Le colis n'a pas pu être créé. Vérifie ta connexion, puis réessaie.";
@@ -258,6 +260,12 @@ function builder() {
     Object.assign(state, { to: "", from: state.from, msg: "", q: ITEMS.map(() => 0), c: [] });
     save(); builder(); window.scrollTo({ top: 0, behavior: "smooth" });
   };
+
+  if (justSent) {
+    $("#link").value = justSent.link; $("#prev").href = justSent.link; $("#out").hidden = false;
+    $("#out .hint").textContent = `Ton colis${justSent.to ? " pour " + justSent.to : ""} est prêt : envoie-lui ce lien. La boîte a été vidée pour ton prochain colis.`;
+    setTimeout(() => $("#out").scrollIntoView({ behavior: "smooth", block: "center" }), 50);
+  }
 }
 
 function shareLink(code) {
